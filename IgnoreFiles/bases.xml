@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<bases>
+    <base id = "dwórk">
+        <attrs>nom:sg:m3</attrs>
+        <pl>dworek</pl>
+        <value>dwórk</value>
+    </base>
+    <base id = "wastna">wastna</base>
+</bases>
