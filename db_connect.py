@@ -42,10 +42,14 @@ class DBConnection:
         :param s_term:
         :return:
         """
-        q = "SELECT * FROM " + table + " WHERE " + column + " ~* '" + s_term + "';"
+        from psycopg2 import sql
+        q = sql.SQL("SELECT * FROM {} WHERE {} ~* %s").format(
+            sql.Identifier(table),
+            sql.Identifier(column)
+        )
 
         try:
-            self.cur.execute(q)
+            self.cur.execute(q, (s_term,))
 
         except DatabaseError as db_err:
             print(f'Error executing query: {db_err}')
@@ -59,17 +63,14 @@ class DBConnection:
     def insert_records(self, in_set):
         remove_set = {''}
         for word in in_set:
-            select_q = "SELECT * FROM FORMS WHERE FORM = '" + word + "'"
-            self.cur.execute(select_q)
+            self.cur.execute("SELECT * FROM FORMS WHERE FORM = %s", (word,))
             rows = self.cur.fetchall()
             if rows:
                 if rows[0][0] == word:
                     remove_set.add(word)
         for w in in_set:
             if w not in remove_set:
-                q = "INSERT INTO FORMS (FORM) VALUES ('" + w + "')"
-                self.cur.execute(q)
-        # rows = cur.fetchall()
+                self.cur.execute("INSERT INTO FORMS (FORM) VALUES (%s)", (w,))
         self.conn.commit()
         print("Records created!")
 
@@ -77,19 +78,17 @@ class DBConnection:
         pass
 
     def find_adjectives(self, search):
-        select_q = "SELECT * FROM FORMS WHERE FORM LIKE '" + search + "'"
-        self.cur.execute(select_q)
-        pass
+        self.cur.execute("SELECT * FROM FORMS WHERE FORM LIKE %s", (search,))
 
     def tag_records(self):
-        q = "SELECT * FROM FORMS;"
-        self.cur.execute(q)
+        self.cur.execute("SELECT * FROM FORMS;")
         rows = self.cur.fetchall()
         for r in rows:
             w = Word(r[0])
             if w.is_adjective():
-                uq = "UPDATE FORMS set ATTRS = \'adj\' where ID LIKE " + w.root
-                self.cur.execute(uq)
+                self.cur.execute(
+                    "UPDATE FORMS SET ATTRS = 'adj' WHERE ID = %s", (w.root,)
+                )
                 self.conn.commit()
 
 
