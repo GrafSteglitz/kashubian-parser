@@ -72,20 +72,30 @@ class OutputStats:
         for stats_dict in self.stats_list:
             pass
 
-    def final_stats(self, big_list: list, word_list: list):
+    def final_stats(self, big_list: list):
         """
-
         :param big_list: annotated corpus
-        :param word_list: flat word list for corpus length
         """
-        unparsed_count = 0
-        corpus_length = len(word_list)
         self.unparsed = []
-        for sentence in big_list:
-            for each in sentence:
-                if len(each['attrs']) > 1:
-                    unparsed_count += 1
-                    self.unparsed.append(each)
-        percent = str((unparsed_count/corpus_length)*100) + '%'
+        self.ambiguous = []
+        self.disambiguated = []
 
-        logger.info(f"Words unparsed: {unparsed_count}/{corpus_length} (= {percent}%)")
+        for sentence in big_list:
+            for word in sentence:
+                n = len(word['attrs'])
+                if n == 0:
+                    self.unparsed.append(word)
+                elif n == 1:
+                    self.disambiguated.append(word)
+                else:
+                    self.ambiguous.append(word)
+
+        total = len(self.unparsed) + len(self.disambiguated) + len(self.ambiguous)
+
+        def pct(count):
+            return f"{(count / total) * 100:.1f}%" if total else "0%"
+
+        logger.info(f"Total tokens: {total}")
+        logger.info(f"  Disambiguated (1 analysis):  {len(self.disambiguated):>5}  ({pct(len(self.disambiguated))})")
+        logger.info(f"  Ambiguous     (2+ analyses): {len(self.ambiguous):>5}  ({pct(len(self.ambiguous))})")
+        logger.info(f"  Unparsed      (no analysis): {len(self.unparsed):>5}  ({pct(len(self.unparsed))})")

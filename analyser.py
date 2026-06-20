@@ -71,7 +71,7 @@ class Analyser(DataHandler):
 
         :return:
         """
-        self.stats.final_stats(self._big_list, self._word_list)
+        self.stats.final_stats(self._big_list)
 
     def _build_morph_dict(self):
         """
