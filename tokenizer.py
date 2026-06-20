@@ -40,10 +40,6 @@ class Tokenizer(DBHandler):
         for count1, s in enumerate(self.sentence_list):
             self.big_list.append([])
             current_sentence = self.big_list[count1]
-            # if not s:
-            #     continue
-            # self.big_dict.update({count1: {'value': s}})
-            sentence_list = []
 
             for count2, orth in enumerate(s):
                 word = orth.lower()
@@ -66,7 +62,6 @@ class Tokenizer(DBHandler):
                     word_dict.update(match_endings)
 
                 current_sentence.append(word_dict)
-            self.big_list.append(sentence_list)
 
         # ltc = len(self.tokenized_corpus)
         # lwl = len(self.word_list)
