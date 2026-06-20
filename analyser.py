@@ -7,7 +7,7 @@ from data_handler import DataHandler
 from db_handler import DBHandler
 from file_handler import FileHandler
 from helpers import make_list, reverse_by_length, update_vals
-from mongo_handler import MongoConnection
+from json_handler import write_json
 from morphemes import noun_suffixes, \
     adjective_suffixes, verb_prefixes
 from output_stats import OutputStats
@@ -61,8 +61,7 @@ class Analyser(DataHandler):
         self.syntax_parser.parse(self._big_list)
 
         out_corpus = {self.text_name: self._big_list}
-        m = MongoConnection()
-        m.insert(out_corpus)
+        write_json(out_corpus, './JSON/corpus_output.json', offset=4)
         self.stats.get_collocations()
 
         return self._big_list
@@ -72,7 +71,7 @@ class Analyser(DataHandler):
 
         :return:
         """
-        self.stats.final_stats(self._big_list, self._word_list)
+        self.stats.final_stats(self._big_list)
 
     def _build_morph_dict(self):
         """
