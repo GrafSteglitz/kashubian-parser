@@ -222,7 +222,7 @@ def update_vals(old_dict, changes_dict):
             old_dict[each].append(changes_dict[each])
         else:
             old_dict.update({each: changes_dict[each]})
-    return
+    return old_dict
 
 
 

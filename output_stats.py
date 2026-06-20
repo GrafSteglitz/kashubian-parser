@@ -7,30 +7,24 @@ class OutputStats:
     """
     A class to produce statistics about a given Kashubian text prior to parsing.
     """
-
-    # word_set: set = field(init=False)
-    # word_list: list = field(init=False)
-    # stats_dict: dict = field(init=False)
-    # stats_list: list = field(init=False)
-    # unparsed: list = field(init=False)
-    # big_list: list = field(init=False)
     def __init__(self):
-        self.word_set = set()
-        self.word_list = []
         self.stats_dict = {}
         self.stats_list = []
         self.unparsed = []
-        self.big_list = []
+        self._word_list = []
+        self._word_set = set()
 
-    def get_word_stats(self):
+    def record_word_stats(self, word_list: list, word_set: set):
         """
-        A method that wraps get_most_frequent()
-        :return:
+        Compute and write word frequency statistics.
+        :param word_list: flat list of all words in the corpus
+        :param word_set: set of unique words
         """
-        self.stats_dict = {k: '' for k in self.word_set}
-
-        for each in self.word_list:
-            self.stats_dict[each] = self.word_list.count(each)
+        self._word_list = word_list
+        self._word_set = word_set
+        self.stats_dict = {k: '' for k in word_set}
+        for each in word_list:
+            self.stats_dict[each] = word_list.count(each)
         self.get_most_frequent()
 
     def get_most_frequent(self, rank=50):
@@ -39,7 +33,6 @@ class OutputStats:
         :param rank:
         :return:
         """
-        # self.stats_list = [k,v for k,v in self.stats_dict.items()]
         freq_list = []
         for k, v in self.stats_dict.items():
             new_dict = {k: v}
@@ -52,7 +45,6 @@ class OutputStats:
         freq_list.sort(reverse=True, key=by_freq)
         rank = min(rank, len(freq_list) - 1)
 
-        # print(freq_list[0:rank])
         self.stats_list = freq_list
         self.write_freqs()
 
@@ -67,28 +59,29 @@ class OutputStats:
                 return l
 
             for each in self.stats_list:
-                f.write(f'{unpack(each)[0]} {unpack(each)[1]}')
+                f.write(f'{unpack(each)[0]} {unpack(each)[1]}\n')
 
     def get_collocations(self):
         """
         Retrieve a list of the most common collocations in the text.
         :return:
         """
-        if not self.word_set or not self.word_list:
+        if not self._word_set or not self._word_list:
             self.get_most_frequent()
 
         for stats_dict in self.stats_list:
             pass
 
-    def final_stats(self):
+    def final_stats(self, big_list: list, word_list: list):
         """
 
-        :return:
+        :param big_list: annotated corpus
+        :param word_list: flat word list for corpus length
         """
         unparsed_count = 0
-        corpus_length = len(self.word_list)
+        corpus_length = len(word_list)
         self.unparsed = []
-        for sentence in self.big_list:
+        for sentence in big_list:
             for each in sentence:
                 if len(each['attrs']) > 1:
                     unparsed_count += 1
@@ -96,4 +89,3 @@ class OutputStats:
         percent = str((unparsed_count/corpus_length)*100) + '%'
 
         logger.info(f"Words unparsed: {unparsed_count}/{corpus_length} (= {percent}%)")
-        # logger.info("Words unparsed: d%/d% (= s%)",unparsed_count,corpus_length,percent)

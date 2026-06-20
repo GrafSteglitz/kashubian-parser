@@ -4,11 +4,10 @@
 import re
 
 from data_handler import DataHandler
-# ignore_list, ignore_particles, byc, byc_past, byc_future, miec, co, nic, num
+from db_handler import DBHandler
 from file_handler import FileHandler
 from helpers import make_list, reverse_by_length, update_vals
 from mongo_handler import MongoConnection
-# from morphemes import *
 from morphemes import noun_suffixes, \
     adjective_suffixes, verb_prefixes
 from output_stats import OutputStats
@@ -17,64 +16,70 @@ from preprocessor import Preprocessor
 from tokenizer import Tokenizer
 from loggers.loggings import logger
 
-# from dataclasses import dataclass, field
-
-# from copy import deepcopy
-
 logger.info('Loaded analyser.py')
 
-# @dataclass
-class Analyser(Preprocessor, OutputStats, Tokenizer, ParseSyntax, DataHandler):
+
+class Analyser(DataHandler):
     """
     @class
     A class that conducts analysis of a Kashubian-language prose text.
     """
-    # data: str
-    # use_db: bool
-    # big_list: list = field(init=False)
 
     def __init__(self, data, use_db, text_name):
-        super().__init__()
         self.data = data
-        self.use_db = use_db
         self.text_name = text_name
         self.suffixes = noun_suffixes
+        self.vprefs = verb_prefixes
+        self.results = {}
+        self.regexes = {'consonants': r'wrtpsdfghklzcbnmżń', 'vowels': r'aeéëùuòóôãą'}
 
         ignores = FileHandler(in_file='ConfigFiles/ignores.txt')
-        self.custom_ignores_dict = ignores.read_lines()
+        custom_ignores_dict = ignores.read_lines()
 
-        self.vprefs = verb_prefixes
+        # intermediate pipeline results stored so final_stats() can be called after do_analyse()
+        self._word_list = []
+        self._big_list = []
 
-        self.results = {}
-
-        self.regexes = {'consonants': r'wrtpsdfghklzcbnmżń', 'vowels': r'aeéëùuòóôãą'}
-        self.big_list = []
+        self.preprocessor = Preprocessor()
+        db_handler = DBHandler() if use_db else None
+        self.tokenizer = Tokenizer(db_handler=db_handler, custom_ignores_dict=custom_ignores_dict)
+        self.syntax_parser = ParseSyntax()
+        self.stats = OutputStats()
 
     def do_analyse(self):
         """
 
         :return:
         """
-        self.preprocess()
-        self.get_word_stats()
-        self.tokenize()
-        self.build_morph_dict()
-        self.syntactic_parse()
-        # self.check_unresolveds()
-        out_corpus = {self.text_name: self.big_list}
+        preprocessed = self.preprocessor.preprocess(self.data)
+        self._word_list = preprocessed.word_list
+
+        self.stats.record_word_stats(preprocessed.word_list, preprocessed.word_set)
+
+        self._big_list = self.tokenizer.tokenize(preprocessed.sentence_list)
+        self._build_morph_dict()
+        self.syntax_parser.parse(self._big_list)
+
+        out_corpus = {self.text_name: self._big_list}
         m = MongoConnection()
         m.insert(out_corpus)
-        self.get_collocations()
-        # write_json(out_corpus, './JSON/corpus_output.json')
+        self.stats.get_collocations()
 
-        return self.big_list
+        return self._big_list
 
-    def build_morph_dict(self):
+    def final_stats(self):
         """
 
         :return:
         """
-        for s_list in self.big_list:
+        self.stats.final_stats(self._big_list, self._word_list)
+
+    def _build_morph_dict(self):
+        """
+
+        :return:
+        """
+        for s_list in self._big_list:
             for w_index, word_type in enumerate(s_list):
 
                 def parse(index, word):
@@ -82,7 +87,6 @@ class Analyser(Preprocessor, OutputStats, Tokenizer, ParseSyntax, DataHandler):
                         if 'ignore' in word:
                             if not word['ignore']:
                                 self.adj_parse(word, index)
-                                # self.syntactic_parse(w_index, value)
 
                 if isinstance(word_type, dict):
                     parse(w_index, word_type)
@@ -99,40 +103,22 @@ class Analyser(Preprocessor, OutputStats, Tokenizer, ParseSyntax, DataHandler):
         :param w_index:
         :return:
         """
-        # do some regexes to identify obvious categories
-
         in_dict.update({'index': w_index})
-        patt_ck = re.compile(r'.+[tdrc][gk]$')
-        # patt_gk = re.compile(r'[gk]$')
         stem = ''
         ending = ''
 
-        # if 'attrs' in in_dict:
-        #     if in_dict['attrs'][0] in ignore_cats:
-        #         return
         if 'morph' in in_dict and in_dict['morph']:
             stem = in_dict['morph'][0]
             ending = in_dict['morph'][-1]
         word = in_dict['value']
-        # ending = in_dict['morph'][-1]
-        # morphological categories for the method to ignore
-
-        # if self.search(patt_ck, word):
-        #     in_dict['attrs'] = make_list('subst:m3:nom:acc')
-        #     in_dict['syntax_resolved'] = True
-        #     return
-        # elif self.search(patt_gk, word):
-        #     in_dict['attrs'] = self.attributes_to_list('subst:m:nom')
 
         patt_praet = re.compile(r'ł[aeoë]$|lë$')
-        if self.search(patt_praet, word):
+        if re.search(patt_praet, word):
             result = self.get_praet(word)
             if result:
                 in_dict.update(result)
                 in_dict['syntax_resolved'] = True
                 return
-
-        # check if has adj ending then check if participle
 
         if self.check_adj_stem(stem, ending, in_dict) or self.check_s_indefs(word, in_dict):
             in_dict['syntax_resolved'] = True
@@ -151,14 +137,12 @@ class Analyser(Preprocessor, OutputStats, Tokenizer, ParseSyntax, DataHandler):
             if infl_stem in s_indefs:
                 in_dict['attrs'] = make_list(s_indefs[infl_stem]) + make_list('s-indef')
                 in_dict['morph'] = [infl_stem, 's']
-                # in_dict['syntax_resolved'] = True
                 return True
             for a in adjs:
                 if infl_stem.endswith(a):
                     stem = re.sub(a, '', infl_stem, 1)
                     if stem in ['jacz', 'cz', 'jak', 'czedë', 'jakò']:
                         in_dict['attrs'] = make_list(adjective_suffixes[a]) + make_list('s-indef')
-                        # in_dict['syntax_resolved'] = True
                         in_dict.update({'morph': [stem, a, 's']})
                         return True
         return False
@@ -171,7 +155,6 @@ class Analyser(Preprocessor, OutputStats, Tokenizer, ParseSyntax, DataHandler):
         :param in_dict: word dict to be examined
         :return: True if found, False
         """
-
         adjs = self.dict_to_reverse_list(adjective_suffixes)
         if not ending or ending not in adjs:
             return False
@@ -179,15 +162,9 @@ class Analyser(Preprocessor, OutputStats, Tokenizer, ParseSyntax, DataHandler):
         adj_patts = {'pact': 'ąc',
                      'ppas': 'ón'}
 
-        # for a in adjs:
-        #     # check for adjectives and participle adjectives
-        #     adj_regex = fr'{a}$'
-        #     if self.search(adj_regex, ending):
-        #         # now check the stem
-
         def check_adj_stem(adj_attr, in_patt):
             in_patt = re.compile(fr'{in_patt}$')
-            if self.search(in_patt, stem):
+            if re.search(in_patt, stem):
                 in_dict['attrs'] = make_list(adj_attr)
                 return True
             return False
@@ -212,12 +189,12 @@ class Analyser(Preprocessor, OutputStats, Tokenizer, ParseSyntax, DataHandler):
         }
         praet_list = reverse_by_length(praet_dict)
         for item in praet_list:
-            if self.search(item, word):
+            if re.search(item, word):
                 split_patt = fr'({item})$'
                 split = re.split(split_patt, word)
                 split = [a for a in split if a]
                 vowel_patt = re.compile(r'([aoë]$)')
-                if self.search(vowel_patt, split[-1]):
+                if re.search(vowel_patt, split[-1]):
                     new_endings = re.split(vowel_patt, split[-1])
                     new_endings = [a for a in new_endings if a]
                     split.pop()
@@ -228,18 +205,16 @@ class Analyser(Preprocessor, OutputStats, Tokenizer, ParseSyntax, DataHandler):
                 return out_dict
         return None
 
-
     def check_unresolveds(self):
         """
 
         :return:
         """
-        for sentence in self.big_list:
+        for sentence in self._big_list:
             for word in sentence:
                 if not word['syntax_resolved'] or len(word['attrs']) > 1:
                     self.cross_examine(word)
 
-    # @staticmethod
     def cross_examine(self, word_dict):
         """
 
@@ -254,7 +229,7 @@ class Analyser(Preprocessor, OutputStats, Tokenizer, ParseSyntax, DataHandler):
         word_family = []
         if 'morph' in word_dict:
             stem = word_dict['morph'][0]
-        for each in self.word_set:
+        for each in self.stats._word_set:
             if each.startswith(stem):
                 word_family.append(each)
         if len(word_family) > 2:
@@ -262,15 +237,6 @@ class Analyser(Preprocessor, OutputStats, Tokenizer, ParseSyntax, DataHandler):
 
 
 if __name__ == '__main__':
-    # task = Analyser()
-    # print(task.process_attributes("ppron:3:dat:loc:sg:m2:m3:f:n"))
-    # my_set = {'1', '2', '3', '4'}
-    # reverse_by_length(my_set)
-    # make_attrs_dict(['adj', 'n', 'nom', 'acc', 'sg'])
-    # print(merge_dicts([noun_suffixes, adjective_suffixes]))
-    # task.get_adjective("mieszkanié")
-    # task.db_lookup("gòsc%")
-    # print(make_list(noun_suffixes['a']))
     my_dict = {'types': ['cat', 'mouse', 'pigeon', 'coyote'], 'foods': ['chicken', 'raisins', 'seeds', 'rabbit']}
     next_dict = {'types': ['walrus', 'camel', 'cat', 'pigeon']}
     my_new_dict = update_vals(my_dict, next_dict)
