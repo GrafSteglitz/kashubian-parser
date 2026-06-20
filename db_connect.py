@@ -24,8 +24,8 @@ class DBConnection:
                                          port=self.db_port)
             self.cur = self.conn.cursor()
             logging.info("Opened database successfully")
-        except DatabaseError as db_err:
-            logging.error(f"Database error: {db_err}")
+        except Exception as db_err:
+            logging.warning(f"Could not connect to lexical database, continuing without it: {db_err}")
 
     def close(self):
         """
