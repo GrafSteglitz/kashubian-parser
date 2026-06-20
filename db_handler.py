@@ -27,14 +27,12 @@ class DBHandler:
         if len(query) > 2:
             # check if the morphological form has already been found and stored
             if query in self.db_matches:
-                db_match_attrs = self.db_matches[query]
-                return
+                return self.db_matches[query]
             db_match_attrs = self.get_attrs_from_db(query)
             if not db_match_attrs:
-                return
-            match_record = {query: db_match_attrs}
-            if query not in self.db_matches:
-                self.db_matches.update(match_record)
+                return None
+            self.db_matches[query] = db_match_attrs
+            return db_match_attrs
 
     def get_attrs_from_db(self, query, table='DICT', col='LEXEME'):
         """

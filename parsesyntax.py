@@ -59,19 +59,18 @@ class ParseSyntax:
         # # break on the first word that does not match
         found_req = None
         for req in reqs:
-            # found_req = False
             if found_req:
                 break
             i = 1
             while i < len(sentence_list):
-                # case_match = True or False
                 skip_list = ['coord']
-                if not self.check_reqs(req, jump(i)):
-                    for skip in skip_list:
-                        if not self.attrs_contains(skip, jump(i)['attrs']):
-                            break
-
-                found_req = req
+                next_word = jump(i)
+                if self.check_reqs(req, next_word):
+                    found_req = req
+                    break
+                # skip coordinating conjunctions and keep looking
+                if not self.attrs_contains('coord', next_word['attrs']):
+                    break
                 i += 1
 
         if found_req:

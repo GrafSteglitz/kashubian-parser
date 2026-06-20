@@ -67,7 +67,7 @@ class OutputStats:
                 return l
 
             for each in self.stats_list:
-                f.write(f'{unpack(each)[0]} {unpack(each)[1]}')
+                f.write(f'{unpack(each)[0]} {unpack(each)[1]}\n')
 
     def get_collocations(self):
         """

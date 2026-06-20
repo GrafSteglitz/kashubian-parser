@@ -17,21 +17,23 @@ class DBConnection:
         self.db_pass = os.getenv('DB_PASS')
         self.db_host = os.getenv('DB_HOST')
         self.db_port = os.getenv('DB_PORT')
+        self.conn = None
+        self.cur = None
         try:
             self.conn = psycopg2.connect(database=self.db, user=self.db_user, password=self.db_pass, host=self.db_host,
                                          port=self.db_port)
+            self.cur = self.conn.cursor()
+            logging.info("Opened database successfully")
         except DatabaseError as db_err:
             logging.error(f"Database error: {db_err}")
-
-        logging.info("Opened database successfully")
-        self.cur = self.conn.cursor()
 
     def close(self):
         """
 
         :return:
         """
-        self.conn.close()
+        if self.conn:
+            self.conn.close()
 
 
     def search(self, table, column, s_term):
@@ -48,6 +50,8 @@ class DBConnection:
             sql.Identifier(column)
         )
 
+        if not self.cur:
+            return []
         try:
             self.cur.execute(q, (s_term,))
 
