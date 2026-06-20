@@ -1,28 +1,23 @@
 """
 @module
 """
-# from dataclasses import dataclass, field
-
 from morphemes import prepositions, case
 
 
-# @dataclass
 class ParseSyntax:
     """
     A class to parse the syntax of Kashubian sentences.
     """
-    # big_list: list = field(init=False)
-    def __init__(self):
-        self.big_list = []
 
-    def syntactic_parse(self):
+    def parse(self, big_list: list) -> list:
         """
-        The method that invokes the sentence-oriented parse_sentence() method.
-        :return: None
+        Run syntactic parsing over an annotated big_list.
+        :param big_list: list of tokenized sentences
+        :return: big_list with syntax_resolved flags updated in place
         """
-        for sentence in self.big_list:
-            # nxt = next(iter(self.big_list))
+        for sentence in big_list:
             self.parse_sentence(sentence)
+        return big_list
 
     def parse_sentence(self, word_list):
         """
@@ -50,20 +45,15 @@ class ParseSyntax:
 
         def jump(offset=1):
             new_index = index + offset
-            # if new_index > len(sentence_list) - 1:
-            #     new_index = len(sentence_list) - 1
             new_index = min(new_index, len(sentence_list) - 1)
             return sentence_list[new_index]
 
-        # # loop through words in the sentence while they match the reqs specified by the preposition
-        # # break on the first word that does not match
         found_req = None
         for req in reqs:
             if found_req:
                 break
             i = 1
             while i < len(sentence_list):
-                skip_list = ['coord']
                 next_word = jump(i)
                 if self.check_reqs(req, next_word):
                     found_req = req
@@ -103,16 +93,13 @@ class ParseSyntax:
         except TypeError:
             print(f'{attrs_list} is not iterable')
 
-        # checking for conjunctions (they have no bearing on case usage)
         if in_word_dict['value'] == 'i':
-            # print('i')
             pass
         list_of_match_sets = []
 
         for attrs_set in attrs_list:
             if attrs_set is None:
                 continue
-                # print('attrs_set is not iterable')
             if req in attrs_set:
                 current_list = [a for a in attrs_set if a not in case and a != req]
                 current_list.append(req)
